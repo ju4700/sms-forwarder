@@ -4,13 +4,13 @@ An Android app that automatically monitors incoming bKash SMS messages and forwa
 
 ## Features
 
-- 📱 **Automatic SMS Monitoring**: Listens for incoming bKash SMS messages in real-time
-- 🔄 **Automatic Forwarding**: Sends payment information to your configured API endpoint
-- 💳 **Payment Tracking**: View all forwarded payments with status tracking
-- 📊 **SMS Logs**: Complete history of all SMS messages received
-- ⚙️ **Configurable Filters**: Customize which SMS messages to forward
-- 🧪 **Test Mode**: Simulate SMS messages for testing without real transactions
-- 🔒 **Secure**: All data is encrypted and permissions are properly managed
+- **Automatic SMS Monitoring**: Listens for incoming bKash SMS messages in real-time
+- **Automatic Forwarding**: Sends payment information to your configured API endpoint
+- **Payment Tracking**: View all forwarded payments with status tracking
+- **SMS Logs**: Complete history of all SMS messages received
+- **Configurable Filters**: Customize which SMS messages to forward
+- **Test Mode**: Simulate SMS messages for testing without real transactions
+- **Secure**: All data is encrypted and permissions are properly managed
 
 ## Screenshots
 
