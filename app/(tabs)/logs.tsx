@@ -1,0 +1,225 @@
+import { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
+import { CheckCircle, XCircle } from 'lucide-react-native';
+import { supabase, SmsLog } from '@/lib/supabase';
+
+export default function LogsScreen() {
+  const [logs, setLogs] = useState<SmsLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadLogs = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sms_logs')
+        .select('*')
+        .order('received_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setLogs(data || []);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadLogs();
+  }, [loadLogs]);
+
+  const renderLog = ({ item }: { item: SmsLog }) => (
+    <View style={styles.logCard}>
+      <View style={styles.logHeader}>
+        <View style={styles.senderContainer}>
+          <Text style={styles.sender}>{item.sender}</Text>
+        </View>
+        <View style={styles.forwardedBadge}>
+          {item.forwarded ? (
+            <>
+              <CheckCircle size={16} color="#16a34a" />
+              <Text style={styles.forwardedText}>Forwarded</Text>
+            </>
+          ) : (
+            <>
+              <XCircle size={16} color="#6b7280" />
+              <Text style={styles.notForwardedText}>Not Forwarded</Text>
+            </>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.logContent}>
+        <Text style={styles.contentText} numberOfLines={4}>
+          {item.content}
+        </Text>
+      </View>
+
+      <View style={styles.logFooter}>
+        <Text style={styles.timestamp}>
+          {new Date(item.received_at).toLocaleString()}
+        </Text>
+        {item.payment_id && (
+          <Text style={styles.linkedBadge}>Linked to Payment</Text>
+        )}
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#16a34a" />
+        <Text style={styles.loadingText}>Loading logs...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={logs}
+        renderItem={renderLog}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No SMS logs yet</Text>
+            <Text style={styles.emptySubtext}>
+              SMS messages received by the app will be logged here
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  listContent: {
+    padding: 16,
+  },
+  logCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  senderContainer: {
+    flex: 1,
+  },
+  sender: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  forwardedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#f0fdf4',
+  },
+  forwardedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  notForwardedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  logContent: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  contentText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  logFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  linkedBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2563eb',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});
