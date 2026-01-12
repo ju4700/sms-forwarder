@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CheckCircle, XCircle } from 'lucide-react-native';
-import { supabase, SmsLog } from '@/lib/supabase';
+import { getSmsLogs, SmsLog } from '@/services/sms-forwarder';
 
 export default function LogsScreen() {
   const [logs, setLogs] = useState<SmsLog[]>([]);
@@ -17,14 +17,8 @@ export default function LogsScreen() {
 
   const loadLogs = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('sms_logs')
-        .select('*')
-        .order('received_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      setLogs(data || []);
+      const data = await getSmsLogs();
+      setLogs(data);
     } catch (error) {
       console.error('Error loading logs:', error);
     } finally {
@@ -51,7 +45,7 @@ export default function LogsScreen() {
         <View style={styles.forwardedBadge}>
           {item.forwarded ? (
             <>
-              <CheckCircle size={16} color="#16a34a" />
+              <CheckCircle size={16} color="#0057FF" />
               <Text style={styles.forwardedText}>Forwarded</Text>
             </>
           ) : (
@@ -71,11 +65,8 @@ export default function LogsScreen() {
 
       <View style={styles.logFooter}>
         <Text style={styles.timestamp}>
-          {new Date(item.received_at).toLocaleString()}
+          {new Date(item.receivedAt).toLocaleString()}
         </Text>
-        {item.payment_id && (
-          <Text style={styles.linkedBadge}>Linked to Payment</Text>
-        )}
       </View>
     </View>
   );
@@ -83,7 +74,7 @@ export default function LogsScreen() {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#16a34a" />
+        <ActivityIndicator size="large" color="#0057FF" />
         <Text style={styles.loadingText}>Loading logs...</Text>
       </View>
     );
@@ -115,13 +106,13 @@ export default function LogsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
   },
   loadingText: {
     marginTop: 12,
@@ -129,46 +120,43 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   listContent: {
-    padding: 16,
+    padding: 0,
   },
   logCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   logHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   senderContainer: {
     flex: 1,
   },
   sender: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
+    letterSpacing: -0.3,
   },
   forwardedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   forwardedText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#16a34a',
+    color: '#0057FF',
   },
   notForwardedText: {
     fontSize: 12,
@@ -176,15 +164,13 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   logContent: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   contentText: {
     fontSize: 14,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 22,
+    fontFamily: 'monospace',
   },
   logFooter: {
     flexDirection: 'row',
@@ -195,15 +181,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9ca3af',
   },
-  linkedBadge: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2563eb',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -212,13 +189,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#6b7280',
     textAlign: 'center',
     lineHeight: 20,
   },

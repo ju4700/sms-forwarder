@@ -7,21 +7,24 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  Switch,
 } from 'react-native';
-import { Save, RefreshCw, Trash2, Copy } from 'lucide-react-native';
-import { getConfig, saveConfig, getStats, resetStats, ForwarderConfig } from '@/services/sms-forwarder';
-import * as Clipboard from 'expo-clipboard';
+import { Save, RefreshCw, Trash2 } from 'lucide-react-native';
+import {
+  getConfig,
+  saveConfig,
+  resetStats,
+  clearSmsLogs,
+  clearForwardedLogs,
+  ForwarderConfig,
+} from '@/services/sms-forwarder';
 
 export default function SettingsScreen() {
   const [config, setConfig] = useState<ForwarderConfig>({
     apiEndpoint: '',
     enabled: false,
     filterKeywords: [],
-    bkashSenders: [],
   });
   const [keywordInput, setKeywordInput] = useState('');
-  const [senderInput, setSenderInput] = useState('');
   const [saving, setSaving] = useState(false);
 
   const loadConfig = useCallback(async () => {
@@ -56,7 +59,10 @@ export default function SettingsScreen() {
     if (!config.filterKeywords.includes(keywordInput.trim().toLowerCase())) {
       setConfig({
         ...config,
-        filterKeywords: [...config.filterKeywords, keywordInput.trim().toLowerCase()],
+        filterKeywords: [
+          ...config.filterKeywords,
+          keywordInput.trim().toLowerCase(),
+        ],
       });
       setKeywordInput('');
     }
@@ -65,26 +71,7 @@ export default function SettingsScreen() {
   const handleRemoveKeyword = (keyword: string) => {
     setConfig({
       ...config,
-      filterKeywords: config.filterKeywords.filter(k => k !== keyword),
-    });
-  };
-
-  const handleAddSender = () => {
-    if (!senderInput.trim()) return;
-
-    if (!config.bkashSenders.includes(senderInput.trim())) {
-      setConfig({
-        ...config,
-        bkashSenders: [...config.bkashSenders, senderInput.trim()],
-      });
-      setSenderInput('');
-    }
-  };
-
-  const handleRemoveSender = (sender: string) => {
-    setConfig({
-      ...config,
-      bkashSenders: config.bkashSenders.filter(s => s !== sender),
+      filterKeywords: config.filterKeywords.filter((k) => k !== keyword),
     });
   };
 
@@ -106,15 +93,23 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleCopyDefaultEndpoint = async () => {
-    const defaultEndpoint = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sms/forward`;
-    await Clipboard.setStringAsync(defaultEndpoint);
-    Alert.alert('Copied', 'Default API endpoint copied to clipboard');
-  };
-
-  const handleSetDefaultEndpoint = () => {
-    const defaultEndpoint = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sms/forward`;
-    setConfig({ ...config, apiEndpoint: defaultEndpoint });
+  const handleClearLogs = () => {
+    Alert.alert(
+      'Clear All Logs',
+      'Are you sure you want to clear all SMS and forwarded logs? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            await clearSmsLogs();
+            await clearForwardedLogs();
+            Alert.alert('Success', 'All logs have been cleared');
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -123,32 +118,18 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>API Configuration</Text>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>API Endpoint URL</Text>
+          <Text style={styles.label}>Webhook URL</Text>
           <TextInput
             style={styles.input}
             value={config.apiEndpoint}
             onChangeText={(text) => setConfig({ ...config, apiEndpoint: text })}
-            placeholder="https://your-api.com/sms/forward"
+            placeholder="https://your-server.com/sms/webhook"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
           />
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleSetDefaultEndpoint}>
-              <RefreshCw size={16} color="#374151" />
-              <Text style={styles.secondaryButtonText}>Use Default</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleCopyDefaultEndpoint}>
-              <Copy size={16} color="#374151" />
-              <Text style={styles.secondaryButtonText}>Copy Default</Text>
-            </TouchableOpacity>
-          </View>
           <Text style={styles.helpText}>
-            Default: {process.env.EXPO_PUBLIC_SUPABASE_URL?.substring(0, 30)}...
+            SMS data will be sent to this URL via POST request
           </Text>
         </View>
       </View>
@@ -156,7 +137,8 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Filter Keywords</Text>
         <Text style={styles.sectionDescription}>
-          SMS messages containing these keywords will be forwarded
+          SMS messages containing any of these keywords will be forwarded. Leave
+          empty to forward all messages.
         </Text>
 
         <View style={styles.inputRow}>
@@ -167,9 +149,7 @@ export default function SettingsScreen() {
             placeholder="Enter keyword"
             autoCapitalize="none"
           />
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleAddKeyword}>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddKeyword}>
             <Text style={styles.addButtonText}>Add</Text>
           </TouchableOpacity>
         </View>
@@ -186,42 +166,11 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>bKash Senders</Text>
-        <Text style={styles.sectionDescription}>
-          Only SMS from these senders will be monitored
-        </Text>
-
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.flexInput]}
-            value={senderInput}
-            onChangeText={setSenderInput}
-            placeholder="Enter sender name/number"
-          />
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleAddSender}>
-            <Text style={styles.addButtonText}>Add</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.tagContainer}>
-          {config.bkashSenders.map((sender) => (
-            <View key={sender} style={styles.tag}>
-              <Text style={styles.tagText}>{sender}</Text>
-              <TouchableOpacity onPress={() => handleRemoveSender(sender)}>
-                <Text style={styles.tagRemove}>×</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      </View>
-
       <TouchableOpacity
         style={[styles.saveButton, saving && styles.saveButtonDisabled]}
         onPress={handleSave}
-        disabled={saving}>
+        disabled={saving}
+      >
         <Save size={20} color="#ffffff" />
         <Text style={styles.saveButtonText}>
           {saving ? 'Saving...' : 'Save Settings'}
@@ -232,19 +181,33 @@ export default function SettingsScreen() {
         <Text style={styles.dangerTitle}>Danger Zone</Text>
         <TouchableOpacity
           style={styles.dangerButton}
-          onPress={handleResetStats}>
-          <Trash2 size={20} color="#dc2626" />
+          onPress={handleResetStats}
+        >
+          <RefreshCw size={18} color="#e11d48" />
           <Text style={styles.dangerButtonText}>Reset Statistics</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.dangerButton, { marginTop: 8 }]}
+          onPress={handleClearLogs}
+        >
+          <Trash2 size={18} color="#e11d48" />
+          <Text style={styles.dangerButtonText}>Clear All Logs</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>About</Text>
+        <Text style={styles.infoTitle}>How it works</Text>
         <Text style={styles.infoText}>
-          This app monitors incoming SMS messages from bKash and forwards them to your configured API endpoint for payment verification.
+          1. Enable monitoring in the Monitor tab
         </Text>
         <Text style={styles.infoText}>
-          Make sure to grant SMS permissions and enable monitoring in the Monitor tab.
+          2. Add keywords to filter which SMS to forward
+        </Text>
+        <Text style={styles.infoText}>
+          3. Configure your webhook URL to receive SMS data
+        </Text>
+        <Text style={styles.infoText}>
+          4. Matching SMS will be sent to your webhook as JSON
         </Text>
       </View>
     </ScrollView>
@@ -254,27 +217,23 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
   },
   content: {
-    padding: 16,
+    padding: 24,
   },
   section: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 32,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    paddingBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   sectionDescription: {
     fontSize: 14,
@@ -285,20 +244,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
+    textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 14,
     color: '#111827',
+    fontFamily: 'monospace',
   },
   flexInput: {
     flex: 1,
@@ -306,39 +266,17 @@ const styles = StyleSheet.create({
   helpText: {
     fontSize: 12,
     color: '#9ca3af',
-    marginTop: 4,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 8,
     marginTop: 8,
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  secondaryButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
   },
   inputRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 16,
   },
   addButton: {
-    backgroundColor: '#16a34a',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: '#0057FF',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     justifyContent: 'center',
   },
   addButtonText: {
@@ -355,32 +293,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#eff6ff',
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingLeft: 12,
     paddingRight: 8,
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#0057FF',
     gap: 6,
   },
   tagText: {
     fontSize: 14,
-    color: '#2563eb',
+    color: '#0057FF',
     fontWeight: '500',
   },
   tagRemove: {
-    fontSize: 20,
-    color: '#2563eb',
+    fontSize: 18,
+    color: '#0057FF',
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#16a34a',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: '#0057FF',
+    paddingVertical: 16,
+    marginBottom: 32,
   },
   saveButtonDisabled: {
     opacity: 0.6,
@@ -391,52 +329,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dangerZone: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#fee2e2',
+    backgroundColor: '#fff1f2',
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#fb7185',
+    marginBottom: 32,
   },
   dangerTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#dc2626',
-    marginBottom: 12,
+    fontWeight: '700',
+    color: '#e11d48',
+    marginBottom: 16,
   },
   dangerButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#fef2f2',
+    backgroundColor: '#ffffff',
     paddingVertical: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: '#e11d48',
   },
   dangerButtonText: {
-    color: '#dc2626',
+    color: '#e11d48',
     fontSize: 14,
     fontWeight: '600',
   },
   infoBox: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#f9fafb',
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#e5e7eb',
   },
   infoTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1e40af',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#1e40af',
-    lineHeight: 20,
-    marginBottom: 8,
+    color: '#6b7280',
+    lineHeight: 22,
+    marginBottom: 4,
   },
 });

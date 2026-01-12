@@ -8,9 +8,28 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { Shield, ShieldOff, PlayCircle, PauseCircle, Smartphone } from 'lucide-react-native';
-import { useSmsListener, requestSmsPermissions, checkSmsPermissions, simulateIncomingSms, SmsMessage } from '@/modules/sms-listener';
-import { getConfig, getStats, processSms, ForwarderStats, ForwarderConfig, saveConfig } from '@/services/sms-forwarder';
+import {
+  Shield,
+  ShieldOff,
+  PlayCircle,
+  PauseCircle,
+  Smartphone,
+} from 'lucide-react-native';
+import {
+  useSmsListener,
+  requestSmsPermissions,
+  checkSmsPermissions,
+  simulateIncomingSms,
+  SmsMessage,
+} from '@/modules/sms-listener';
+import {
+  getConfig,
+  getStats,
+  processSms,
+  ForwarderStats,
+  ForwarderConfig,
+  saveConfig,
+} from '@/services/sms-forwarder';
 
 export default function MonitorScreen() {
   const [hasPermissions, setHasPermissions] = useState(false);
@@ -40,11 +59,16 @@ export default function MonitorScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  useSmsListener(useCallback(async (message: SmsMessage) => {
-    setLastMessage(message);
-    await processSms(message);
-    await loadData();
-  }, [loadData]));
+  useSmsListener(
+    useCallback(
+      async (message: SmsMessage) => {
+        setLastMessage(message);
+        await processSms(message);
+        await loadData();
+      },
+      [loadData]
+    )
+  );
 
   const handleRequestPermissions = async () => {
     const granted = await requestSmsPermissions();
@@ -63,7 +87,7 @@ export default function MonitorScreen() {
     if (!config.enabled && !config.apiEndpoint) {
       Alert.alert(
         'Configuration Required',
-        'Please configure the API endpoint in Settings before enabling monitoring.'
+        'Please configure the webhook URL in Settings before enabling monitoring.'
       );
       return;
     }
@@ -75,8 +99,8 @@ export default function MonitorScreen() {
 
   const handleTestSms = () => {
     simulateIncomingSms(
-      'bKash',
-      'You have received BDT 500.00 from 01712345678. TrxID: ABC123XYZ Fee: BDT 0.00. Balance: BDT 1000.00'
+      'TestSender',
+      'This is a test SMS message with payment keyword. Transaction ID: TEST123'
     );
   };
 
@@ -94,11 +118,12 @@ export default function MonitorScreen() {
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }>
+      }
+    >
       <View style={styles.statusCard}>
         <View style={styles.statusHeader}>
           {config.enabled ? (
-            <Shield size={32} color="#16a34a" />
+            <Shield size={32} color="#0057FF" />
           ) : (
             <ShieldOff size={32} color="#dc2626" />
           )}
@@ -115,9 +140,12 @@ export default function MonitorScreen() {
         {!hasPermissions && (
           <TouchableOpacity
             style={styles.permissionButton}
-            onPress={handleRequestPermissions}>
+            onPress={handleRequestPermissions}
+          >
             <Smartphone size={20} color="#ffffff" />
-            <Text style={styles.permissionButtonText}>Grant SMS Permissions</Text>
+            <Text style={styles.permissionButtonText}>
+              Grant SMS Permissions
+            </Text>
           </TouchableOpacity>
         )}
 
@@ -125,15 +153,23 @@ export default function MonitorScreen() {
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              config.enabled ? styles.toggleButtonActive : styles.toggleButtonInactive,
+              config.enabled
+                ? styles.toggleButtonActive
+                : styles.toggleButtonInactive,
             ]}
-            onPress={handleToggleMonitoring}>
+            onPress={handleToggleMonitoring}
+          >
             {config.enabled ? (
-              <PauseCircle size={20} color="#ffffff" />
+              <PauseCircle size={20} color="#dc2626" />
             ) : (
               <PlayCircle size={20} color="#ffffff" />
             )}
-            <Text style={styles.toggleButtonText}>
+            <Text
+              style={[
+                styles.toggleButtonText,
+                { color: config.enabled ? '#dc2626' : '#ffffff' },
+              ]}
+            >
               {config.enabled ? 'Stop Monitoring' : 'Start Monitoring'}
             </Text>
           </TouchableOpacity>
@@ -143,7 +179,7 @@ export default function MonitorScreen() {
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.totalReceived}</Text>
-          <Text style={styles.statLabel}>SMS Received</Text>
+          <Text style={styles.statLabel}>Received</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.totalForwarded}</Text>
@@ -194,176 +230,173 @@ export default function MonitorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
   },
   content: {
-    padding: 16,
+    padding: 24,
   },
   statusCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 24,
+    marginBottom: 24,
   },
   statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   statusTextContainer: {
-    marginLeft: 12,
+    marginLeft: 16,
     flex: 1,
   },
   statusTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   statusSubtitle: {
     fontSize: 14,
     color: '#6b7280',
   },
   permissionButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0057FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     gap: 8,
   },
   permissionButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     gap: 8,
+    borderWidth: 1,
   },
   toggleButtonActive: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#ffffff',
+    borderColor: '#dc2626',
   },
   toggleButtonInactive: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#0057FF',
+    borderColor: '#0057FF',
   },
   toggleButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: 16,
+    marginBottom: 24,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#16a34a',
+    color: '#0057FF',
     marginBottom: 4,
+    letterSpacing: -1,
   },
   statLabel: {
     fontSize: 12,
     color: '#6b7280',
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   infoCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 20,
+    marginBottom: 24,
   },
   infoLabel: {
     fontSize: 12,
     color: '#6b7280',
     marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   infoValue: {
     fontSize: 16,
     color: '#111827',
     fontWeight: '500',
+    fontFamily: 'monospace',
   },
   messageCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 20,
+    marginBottom: 24,
   },
   messageTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 12,
+    marginBottom: 16,
+    letterSpacing: -0.3,
   },
   messageDetails: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    paddingBottom: 8,
   },
   messageLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
     width: 60,
+    fontWeight: '500',
   },
   messageValue: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#111827',
     flex: 1,
+    fontWeight: '500',
   },
   messageContent: {
     marginTop: 8,
   },
   messageText: {
     fontSize: 14,
-    color: '#111827',
-    marginTop: 4,
-    lineHeight: 20,
+    color: '#374151',
+    marginTop: 8,
+    lineHeight: 22,
+    fontFamily: 'monospace',
   },
   testButton: {
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#e5e7eb',
   },
   testButtonText: {
-    color: '#374151',
+    color: '#6b7280',
     fontSize: 14,
     fontWeight: '600',
   },

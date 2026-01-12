@@ -1,26 +1,41 @@
 import { Tabs } from 'expo-router';
-import { Activity, History, Settings, FileText } from 'lucide-react-native';
+import { Activity, Send, FileText, Settings } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
-        tabBarActiveTintColor: '#16a34a',
+        tabBarActiveTintColor: '#0057FF',
         tabBarInactiveTintColor: '#6b7280',
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         headerStyle: {
-          backgroundColor: '#16a34a',
+          backgroundColor: '#ffffff',
+          borderBottomWidth: 1,
+          borderBottomColor: '#e5e7eb',
+          elevation: 0,
+          shadowOpacity: 0,
         },
-        headerTintColor: '#ffffff',
+        headerTintColor: '#111827',
         headerTitleStyle: {
-          fontWeight: '600',
+          fontWeight: '700',
+          fontSize: 18,
         },
-      }}>
+        tabBarLabelStyle: {
+          fontWeight: '500',
+          fontSize: 12,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -31,12 +46,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="payments"
+        name="forwarded"
         options={{
-          title: 'Payments',
-          tabBarIcon: ({ size, color }) => (
-            <History size={size} color={color} />
-          ),
+          title: 'Forwarded',
+          tabBarIcon: ({ size, color }) => <Send size={size} color={color} />,
         }}
       />
       <Tabs.Screen

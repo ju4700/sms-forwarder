@@ -3,12 +3,13 @@ import { SmsMessage } from '@/modules/sms-listener';
 
 const CONFIG_KEY = '@sms_forwarder_config';
 const STATS_KEY = '@sms_forwarder_stats';
+const SMS_LOGS_KEY = '@sms_forwarder_logs';
+const FORWARDED_LOGS_KEY = '@sms_forwarder_forwarded';
 
 export type ForwarderConfig = {
   apiEndpoint: string;
   enabled: boolean;
   filterKeywords: string[];
-  bkashSenders: string[];
 };
 
 export type ForwarderStats = {
@@ -18,11 +19,28 @@ export type ForwarderStats = {
   errors: number;
 };
 
+export type SmsLog = {
+  id: string;
+  sender: string;
+  content: string;
+  receivedAt: string;
+  forwarded: boolean;
+};
+
+export type ForwardedLog = {
+  id: string;
+  sender: string;
+  content: string;
+  receivedAt: string;
+  forwardedAt: string;
+  success: boolean;
+  matchedKeyword: string | null;
+};
+
 const DEFAULT_CONFIG: ForwarderConfig = {
   apiEndpoint: '',
   enabled: false,
-  filterKeywords: ['bkash', 'trxid', 'transaction'],
-  bkashSenders: ['bKash', '16247', 'bKash-Pay'],
+  filterKeywords: ['payment', 'transaction', 'received', 'sent', 'balance'],
 };
 
 const DEFAULT_STATS: ForwarderStats = {
@@ -32,6 +50,7 @@ const DEFAULT_STATS: ForwarderStats = {
   errors: 0,
 };
 
+// Config functions
 export async function getConfig(): Promise<ForwarderConfig> {
   try {
     const data = await AsyncStorage.getItem(CONFIG_KEY);
@@ -45,6 +64,7 @@ export async function saveConfig(config: ForwarderConfig): Promise<void> {
   await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
 
+// Stats functions
 export async function getStats(): Promise<ForwarderStats> {
   try {
     const data = await AsyncStorage.getItem(STATS_KEY);
@@ -64,54 +84,76 @@ export async function resetStats(): Promise<void> {
   await AsyncStorage.setItem(STATS_KEY, JSON.stringify(DEFAULT_STATS));
 }
 
-export function shouldForwardSms(message: SmsMessage, config: ForwarderConfig): boolean {
+// SMS Logs functions (all received SMS)
+export async function getSmsLogs(): Promise<SmsLog[]> {
+  try {
+    const data = await AsyncStorage.getItem(SMS_LOGS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveSmsLog(log: SmsLog): Promise<void> {
+  const logs = await getSmsLogs();
+  const updatedLogs = [log, ...logs].slice(0, 100); // Keep last 100 logs
+  await AsyncStorage.setItem(SMS_LOGS_KEY, JSON.stringify(updatedLogs));
+}
+
+export async function clearSmsLogs(): Promise<void> {
+  await AsyncStorage.setItem(SMS_LOGS_KEY, JSON.stringify([]));
+}
+
+// Forwarded Logs functions
+export async function getForwardedLogs(): Promise<ForwardedLog[]> {
+  try {
+    const data = await AsyncStorage.getItem(FORWARDED_LOGS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveForwardedLog(log: ForwardedLog): Promise<void> {
+  const logs = await getForwardedLogs();
+  const updatedLogs = [log, ...logs].slice(0, 100); // Keep last 100 logs
+  await AsyncStorage.setItem(FORWARDED_LOGS_KEY, JSON.stringify(updatedLogs));
+}
+
+export async function clearForwardedLogs(): Promise<void> {
+  await AsyncStorage.setItem(FORWARDED_LOGS_KEY, JSON.stringify([]));
+}
+
+// Check if SMS should be forwarded based on keyword filters
+export function shouldForwardSms(message: SmsMessage, config: ForwarderConfig): { shouldForward: boolean; matchedKeyword: string | null } {
   if (!config.enabled) {
-    return false;
+    return { shouldForward: false, matchedKeyword: null };
   }
 
-  // Check if sender matches bKash senders
-  const senderMatches = config.bkashSenders.some(sender =>
-    message.sender.toLowerCase().includes(sender.toLowerCase())
-  );
-
-  if (!senderMatches) {
-    return false;
+  if (config.filterKeywords.length === 0) {
+    // If no keywords specified, forward all
+    return { shouldForward: true, matchedKeyword: null };
   }
 
   // Check if content contains any filter keywords
   const contentLower = message.content.toLowerCase();
-  const hasKeyword = config.filterKeywords.some(keyword =>
-    contentLower.includes(keyword.toLowerCase())
-  );
-
-  return hasKeyword;
-}
-
-export function extractReferenceId(content: string): string | null {
-  const patterns = [
-    /TrxID[:\s]+([A-Z0-9]+)/i,
-    /Reference[:\s]+([A-Z0-9]+)/i,
-    /Ref[:\s]+([A-Z0-9]+)/i,
-    /Transaction[:\s]+([A-Z0-9]+)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = content.match(pattern);
-    if (match) {
-      return match[1];
+  for (const keyword of config.filterKeywords) {
+    if (contentLower.includes(keyword.toLowerCase())) {
+      return { shouldForward: true, matchedKeyword: keyword };
     }
   }
 
-  return null;
+  return { shouldForward: false, matchedKeyword: null };
 }
 
-export async function forwardSms(message: SmsMessage, config: ForwarderConfig): Promise<boolean> {
+// Forward SMS to API
+export async function forwardSms(message: SmsMessage, config: ForwarderConfig, matchedKeyword: string | null): Promise<boolean> {
+  const logId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     if (!config.apiEndpoint) {
       throw new Error('API endpoint not configured');
     }
-
-    const referenceId = extractReferenceId(message.content);
 
     const response = await fetch(config.apiEndpoint, {
       method: 'POST',
@@ -122,13 +164,24 @@ export async function forwardSms(message: SmsMessage, config: ForwarderConfig): 
         sender: message.sender,
         content: message.content,
         receivedAt: new Date(message.timestamp).toISOString(),
-        referenceId,
+        matchedKeyword,
       }),
     });
 
     if (!response.ok) {
       throw new Error(`API returned ${response.status}`);
     }
+
+    // Save successful forward log
+    await saveForwardedLog({
+      id: logId,
+      sender: message.sender,
+      content: message.content,
+      receivedAt: new Date(message.timestamp).toISOString(),
+      forwardedAt: new Date().toISOString(),
+      success: true,
+      matchedKeyword,
+    });
 
     const stats = await getStats();
     await updateStats({
@@ -139,6 +192,18 @@ export async function forwardSms(message: SmsMessage, config: ForwarderConfig): 
     return true;
   } catch (error) {
     console.error('Error forwarding SMS:', error);
+
+    // Save failed forward log
+    await saveForwardedLog({
+      id: logId,
+      sender: message.sender,
+      content: message.content,
+      receivedAt: new Date(message.timestamp).toISOString(),
+      forwardedAt: new Date().toISOString(),
+      success: false,
+      matchedKeyword,
+    });
+
     const stats = await getStats();
     await updateStats({
       errors: stats.errors + 1,
@@ -147,15 +212,29 @@ export async function forwardSms(message: SmsMessage, config: ForwarderConfig): 
   }
 }
 
+// Process incoming SMS
 export async function processSms(message: SmsMessage): Promise<void> {
   const config = await getConfig();
   const stats = await getStats();
 
+  // Always update received count
   await updateStats({
     totalReceived: stats.totalReceived + 1,
   });
 
-  if (shouldForwardSms(message, config)) {
-    await forwardSms(message, config);
+  const { shouldForward, matchedKeyword } = shouldForwardSms(message, config);
+  
+  // Save to SMS logs
+  const logId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  await saveSmsLog({
+    id: logId,
+    sender: message.sender,
+    content: message.content,
+    receivedAt: new Date(message.timestamp).toISOString(),
+    forwarded: shouldForward,
+  });
+
+  if (shouldForward) {
+    await forwardSms(message, config, matchedKeyword);
   }
 }
