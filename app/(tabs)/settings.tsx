@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native';
 import { Save, RefreshCw, Trash2 } from 'lucide-react-native';
 import {
@@ -23,9 +24,21 @@ export default function SettingsScreen() {
     apiEndpoint: '',
     enabled: false,
     filterKeywords: [],
+    customJsonTemplate: '',
+    allowedSenders: [],
+    blockedSenders: [],
+    customHeaders: {},
+    retryAttempts: 0,
+    retryDelay: 1000,
   });
   const [keywordInput, setKeywordInput] = useState('');
+  const [senderInput, setSenderInput] = useState('');
+  const [senderType, setSenderType] = useState<'allow' | 'block'>('allow');
+  const [headerKey, setHeaderKey] = useState('');
+  const [headerValue, setHeaderValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showJsonTemplate, setShowJsonTemplate] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const loadConfig = useCallback(async () => {
     const data = await getConfig();
@@ -42,9 +55,25 @@ export default function SettingsScreen() {
       return;
     }
 
+    // Validate URL format
+    try {
+      new URL(config.apiEndpoint.trim());
+    } catch {
+      Alert.alert(
+        'Error',
+        'Please enter a valid URL (e.g., https://example.com/api/sms)'
+      );
+      return;
+    }
+
     try {
       setSaving(true);
-      await saveConfig(config);
+      const configToSave = {
+        ...config,
+        apiEndpoint: config.apiEndpoint.trim(),
+      };
+      await saveConfig(configToSave);
+      setConfig(configToSave);
       Alert.alert('Success', 'Settings saved successfully');
     } catch (error) {
       Alert.alert('Error', 'Failed to save settings');
@@ -135,6 +164,59 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Custom JSON Template (Optional)</Text>
+        <Text style={styles.sectionDescription}>
+          Define custom JSON structure to send to your API. Leave empty to use
+          default format.
+        </Text>
+        <Text style={styles.helpText}>
+          Available variables: {'{'}sender{'}'}, {'{'}content{'}'}, {'{'}
+          receivedAt{'}'}, {'{'}transactionId{'}'}, {'{'}amount{'}'}, {'{'}
+          matchedKeyword{'}'}
+        </Text>
+        <Text style={styles.helpText}>
+          Custom regex: {'{'}regex:pattern:group{'}'} - e.g., {'{'}
+          regex:Code:\s*(\d+):1{'}'}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowJsonTemplate(!showJsonTemplate)}
+        >
+          <Text style={styles.toggleButtonText}>
+            {showJsonTemplate ? 'Hide' : 'Show'} JSON Template Editor
+          </Text>
+        </TouchableOpacity>
+
+        {showJsonTemplate && (
+          <TextInput
+            style={[styles.input, styles.jsonInput]}
+            value={config.customJsonTemplate || ''}
+            onChangeText={(text) =>
+              setConfig({ ...config, customJsonTemplate: text })
+            }
+            placeholder={`{\n  "transactionId": "{{transactionId}}",\n  "amount": {{amount}},\n  "sender": "{{sender}}"\n}`}
+            multiline
+            numberOfLines={10}
+            textAlignVertical="top"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        )}
+
+        {config.customJsonTemplate && (
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={() => setConfig({ ...config, customJsonTemplate: '' })}
+          >
+            <Text style={styles.clearButtonText}>
+              Clear Template (Use Default)
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Filter Keywords</Text>
         <Text style={styles.sectionDescription}>
           SMS messages containing any of these keywords will be forwarded. Leave
@@ -165,6 +247,287 @@ export default function SettingsScreen() {
           ))}
         </View>
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Sender Filtering</Text>
+        <Text style={styles.sectionDescription}>
+          Control which senders to forward SMS from. Leave empty to allow all
+          senders.
+        </Text>
+
+        <View style={styles.inputRow}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              senderType === 'allow' && styles.tabButtonActive,
+            ]}
+            onPress={() => setSenderType('allow')}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                senderType === 'allow' && styles.tabButtonTextActive,
+              ]}
+            >
+              Whitelist
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              senderType === 'block' && styles.tabButtonActive,
+            ]}
+            onPress={() => setSenderType('block')}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                senderType === 'block' && styles.tabButtonTextActive,
+              ]}
+            >
+              Blacklist
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.inputRow}>
+          <TextInput
+            style={[styles.input, styles.flexInput]}
+            value={senderInput}
+            onChangeText={setSenderInput}
+            placeholder={
+              senderType === 'allow'
+                ? 'Add allowed sender (e.g., bKash)'
+                : 'Add blocked sender'
+            }
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              if (!senderInput.trim()) return;
+              const list =
+                senderType === 'allow'
+                  ? config.allowedSenders || []
+                  : config.blockedSenders || [];
+              if (!list.includes(senderInput.trim().toLowerCase())) {
+                if (senderType === 'allow') {
+                  setConfig({
+                    ...config,
+                    allowedSenders: [
+                      ...(config.allowedSenders || []),
+                      senderInput.trim().toLowerCase(),
+                    ],
+                  });
+                } else {
+                  setConfig({
+                    ...config,
+                    blockedSenders: [
+                      ...(config.blockedSenders || []),
+                      senderInput.trim().toLowerCase(),
+                    ],
+                  });
+                }
+                setSenderInput('');
+              }
+            }}
+          >
+            <Text style={styles.addButtonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {senderType === 'allow' &&
+          config.allowedSenders &&
+          config.allowedSenders.length > 0 && (
+            <View style={styles.tagContainer}>
+              {config.allowedSenders.map((sender) => (
+                <View key={sender} style={styles.tag}>
+                  <Text style={styles.tagText}>{sender}</Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setConfig({
+                        ...config,
+                        allowedSenders:
+                          config.allowedSenders?.filter((s) => s !== sender) ||
+                          [],
+                      })
+                    }
+                  >
+                    <Text style={styles.tagRemove}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+        {senderType === 'block' &&
+          config.blockedSenders &&
+          config.blockedSenders.length > 0 && (
+            <View style={styles.tagContainer}>
+              {config.blockedSenders.map((sender) => (
+                <View
+                  key={sender}
+                  style={[
+                    styles.tag,
+                    { backgroundColor: '#fff1f2', borderColor: '#fb7185' },
+                  ]}
+                >
+                  <Text style={[styles.tagText, { color: '#e11d48' }]}>
+                    {sender}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setConfig({
+                        ...config,
+                        blockedSenders:
+                          config.blockedSenders?.filter((s) => s !== sender) ||
+                          [],
+                      })
+                    }
+                  >
+                    <Text style={[styles.tagRemove, { color: '#e11d48' }]}>
+                      ×
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+      </View>
+
+      <TouchableOpacity
+        style={styles.toggleButton}
+        onPress={() => setShowAdvanced(!showAdvanced)}
+      >
+        <Text style={styles.toggleButtonText}>
+          {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+        </Text>
+      </TouchableOpacity>
+
+      {showAdvanced && (
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Custom Headers</Text>
+            <Text style={styles.sectionDescription}>
+              Add custom HTTP headers (e.g., Authorization, API-Key). Useful for
+              API authentication.
+            </Text>
+
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, { flex: 0.4 }]}
+                value={headerKey}
+                onChangeText={setHeaderKey}
+                placeholder="Header name"
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={[styles.input, { flex: 0.6 }]}
+                value={headerValue}
+                onChangeText={setHeaderValue}
+                placeholder="Header value"
+                autoCapitalize="none"
+                secureTextEntry={
+                  headerKey.toLowerCase().includes('key') ||
+                  headerKey.toLowerCase().includes('token')
+                }
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                if (!headerKey.trim() || !headerValue.trim()) return;
+                setConfig({
+                  ...config,
+                  customHeaders: {
+                    ...(config.customHeaders || {}),
+                    [headerKey.trim()]: headerValue.trim(),
+                  },
+                });
+                setHeaderKey('');
+                setHeaderValue('');
+              }}
+            >
+              <Text style={styles.addButtonText}>Add Header</Text>
+            </TouchableOpacity>
+
+            {config.customHeaders &&
+              Object.keys(config.customHeaders).length > 0 && (
+                <View style={styles.tagContainer}>
+                  {Object.entries(config.customHeaders).map(([key, value]) => (
+                    <View key={key} style={styles.tag}>
+                      <Text style={styles.tagText}>
+                        {key}:{' '}
+                        {value.length > 20
+                          ? value.substring(0, 20) + '...'
+                          : value}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const newHeaders = {
+                            ...(config.customHeaders || {}),
+                          };
+                          delete newHeaders[key];
+                          setConfig({ ...config, customHeaders: newHeaders });
+                        }}
+                      >
+                        <Text style={styles.tagRemove}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Retry Settings</Text>
+            <Text style={styles.sectionDescription}>
+              Configure automatic retry on API failures. Default: No retries.
+            </Text>
+
+            <View style={styles.inputRow}>
+              <Text style={[styles.label, { flex: 0.5, marginRight: 8 }]}>
+                Retry Attempts:
+              </Text>
+              <TextInput
+                style={[styles.input, { flex: 0.3 }]}
+                value={config.retryAttempts?.toString() || '0'}
+                onChangeText={(text) => {
+                  const num = parseInt(text, 10) || 0;
+                  setConfig({
+                    ...config,
+                    retryAttempts: Math.max(0, Math.min(5, num)),
+                  });
+                }}
+                keyboardType="numeric"
+                placeholder="0"
+              />
+              <Text style={[styles.helpText, { flex: 0.2 }]}>Max 5</Text>
+            </View>
+
+            <View style={styles.inputRow}>
+              <Text style={[styles.label, { flex: 0.5, marginRight: 8 }]}>
+                Retry Delay (ms):
+              </Text>
+              <TextInput
+                style={[styles.input, { flex: 0.3 }]}
+                value={config.retryDelay?.toString() || '1000'}
+                onChangeText={(text) => {
+                  const num = parseInt(text, 10) || 1000;
+                  setConfig({
+                    ...config,
+                    retryDelay: Math.max(100, Math.min(10000, num)),
+                  });
+                }}
+                keyboardType="numeric"
+                placeholder="1000"
+              />
+              <Text style={[styles.helpText, { flex: 0.2 }]}>100-10000</Text>
+            </View>
+          </View>
+        </>
+      )}
 
       <TouchableOpacity
         style={[styles.saveButton, saving && styles.saveButtonDisabled]}
@@ -210,6 +573,15 @@ export default function SettingsScreen() {
           4. Matching SMS will be sent to your webhook as JSON
         </Text>
       </View>
+      <Text style={styles.infoText}>
+        Developed by{' '}
+        <Text
+          style={styles.infoLink}
+          onPress={() => Linking.openURL('https://github.com/ju4700')}
+        >
+          ju4700
+        </Text>
+      </Text>
     </ScrollView>
   );
 }
@@ -373,5 +745,68 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 22,
     marginBottom: 4,
+  },
+  infoLink: {
+    fontSize: 14,
+    color: '#0057FF',
+    lineHeight: 22,
+    marginBottom: 4,
+    textDecorationLine: 'underline',
+  },
+  toggleButton: {
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  toggleButtonText: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  jsonInput: {
+    minHeight: 150,
+    fontFamily: 'monospace',
+    fontSize: 12,
+    marginTop: 12,
+  },
+  clearButton: {
+    backgroundColor: '#fff1f2',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#fb7185',
+  },
+  clearButtonText: {
+    color: '#e11d48',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  tabButtonActive: {
+    backgroundColor: '#0057FF',
+    borderColor: '#0057FF',
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  tabButtonTextActive: {
+    color: '#ffffff',
   },
 });

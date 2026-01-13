@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 export type SmsMessage = {
@@ -11,20 +11,73 @@ export type SmsMessage = {
 export type SmsListenerCallback = (message: SmsMessage) => void;
 
 let listeners: SmsListenerCallback[] = [];
+let smsCheckInterval: NodeJS.Timeout | null = null;
+
+// Try to use native SMS listener if available
+let SmsListener: any = null;
+try {
+  // Try to load react-native-android-sms-listener if installed
+  SmsListener = require('react-native-android-sms-listener');
+} catch {
+  // Library not installed, will use fallback method
+  SmsListener = null;
+}
 
 export function useSmsListener(callback: SmsListenerCallback) {
+  const callbackRef = useRef(callback);
+  
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
   useEffect(() => {
     if (Platform.OS !== 'android') {
       console.warn('SMS listening is only supported on Android');
       return;
     }
 
-    listeners.push(callback);
+    const wrappedCallback = (message: SmsMessage) => {
+      callbackRef.current(message);
+    };
+
+    listeners.push(wrappedCallback);
+
+    // If native SMS listener is available, use it
+    let subscription: any = null;
+    if (SmsListener) {
+      try {
+        console.log('Initializing native SMS listener...');
+        subscription = SmsListener.addListener((message: any) => {
+          console.log('Native SMS received:', message);
+          const smsMessage: SmsMessage = {
+            id: `${message.timestamp || Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            sender: message.originatingAddress || message.address || 'Unknown',
+            content: message.body || '',
+            timestamp: message.timestamp || Date.now(),
+          };
+          
+          // Notify all listeners
+          listeners.forEach(cb => cb(smsMessage));
+        });
+      } catch (error) {
+        console.warn('Error setting up native SMS listener:', error);
+      }
+    } else {
+      // Fallback: Without native SMS listener library, only simulated messages will work
+      console.warn('Native SMS listener not available. Falling back to simulation mode.');
+    }
 
     return () => {
-      listeners = listeners.filter(cb => cb !== callback);
+      if (subscription && typeof subscription.remove === 'function') {
+        try {
+          subscription.remove();
+        } catch (error) {
+          console.warn('Error removing SMS listener subscription:', error);
+        }
+      }
+      listeners = listeners.filter(cb => cb !== wrappedCallback);
     };
-  }, [callback]);
+  }, []);
 }
 
 export async function requestSmsPermissions(): Promise<boolean> {

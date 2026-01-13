@@ -1,11 +1,36 @@
-import { createClient } from '@supabase/supabase-js';
+// This is a reference API route implementation for server-side use
+// It's not used in the mobile app build, only for web/server deployments
+// To use this, install @supabase/supabase-js: npm install @supabase/supabase-js
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+let supabaseClient: any = null;
+try {
+  const { createClient } = require('@supabase/supabase-js');
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && supabaseServiceKey) {
+    supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+  }
+} catch {
+  // Supabase not installed or configured - this is optional
+  console.warn('Supabase client not available. This API route requires @supabase/supabase-js.');
+}
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(request: Request) {
+  if (!supabaseClient) {
+    return new Response(
+      JSON.stringify({ error: 'Supabase client not configured. Install @supabase/supabase-js and configure environment variables.' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = supabaseClient;
 
     const body = await request.json();
     const { sender, content, receivedAt, referenceId } = body;

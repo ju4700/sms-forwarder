@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -29,6 +30,7 @@ import {
   ForwarderStats,
   ForwarderConfig,
   saveConfig,
+  getSmsLogs,
 } from '@/services/sms-forwarder';
 
 export default function MonitorScreen() {
@@ -39,19 +41,51 @@ export default function MonitorScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [configData, statsData, perms] = await Promise.all([
+    const [configData, statsData, perms, smsLogs] = await Promise.all([
       getConfig(),
       getStats(),
       checkSmsPermissions(),
+      getSmsLogs(),
     ]);
     setConfig(configData);
     setStats(statsData);
     setHasPermissions(perms);
+    
+    // Load the most recent message if available
+    if (smsLogs.length > 0) {
+      const latestLog = smsLogs[0];
+      setLastMessage({
+        id: latestLog.id,
+        sender: latestLog.sender,
+        content: latestLog.content,
+        timestamp: new Date(latestLog.receivedAt).getTime(),
+      });
+    }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const initialize = async () => {
+      await loadData();
+      // Request SMS permissions on app startup if not already granted
+      const hasPerms = await checkSmsPermissions();
+      if (!hasPerms) {
+        const granted = await requestSmsPermissions();
+        setHasPermissions(granted);
+        if (granted) {
+          await loadData();
+        }
+      }
+    };
+    initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
