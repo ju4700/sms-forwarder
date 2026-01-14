@@ -1,38 +1,52 @@
 import { Tabs } from 'expo-router';
-import { Activity, Send, FileText, Settings } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Activity, Send, FileText, Settings, Menu } from 'lucide-react-native';
+import { useDrawer } from '../_layout';
+
+interface CustomHeaderProps {
+  title: string;
+}
+
+function CustomHeader({ title }: CustomHeaderProps) {
+  const { openDrawer } = useDrawer();
+
+  return (
+    <View style={styles.header}>
+      <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
+        <Menu size={24} color="#111827" />
+      </TouchableOpacity>
+      <View style={styles.headerSpacer} />
+      <Text style={styles.headerTitle}>{title}</Text>
+    </View>
+  );
+}
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: true,
+        header: ({ options }) => (
+          <CustomHeader title={options.title || 'SMS Forwarder'} />
+        ),
         tabBarActiveTintColor: '#0057FF',
         tabBarInactiveTintColor: '#6b7280',
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: '#e5e7eb',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: 70,
+          paddingBottom: 16,
+          paddingTop: 10,
+          paddingHorizontal: 8,
           elevation: 0,
           shadowOpacity: 0,
-        },
-        headerStyle: {
-          backgroundColor: '#ffffff',
-          borderBottomWidth: 1,
-          borderBottomColor: '#e5e7eb',
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        headerTintColor: '#111827',
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: 18,
         },
         tabBarLabelStyle: {
           fontWeight: '500',
           fontSize: 12,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 4,
         },
       }}
     >
@@ -73,3 +87,29 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  menuButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.5,
+  },
+});
