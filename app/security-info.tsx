@@ -28,6 +28,20 @@ export default function SecurityInfoScreen() {
     }
   };
 
+  const openBatteryOptimizationSettings = async () => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    try {
+      await Linking.openURL(
+        'intent:#Intent;action=android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS;end'
+      );
+    } catch {
+      Linking.openSettings();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -182,6 +196,53 @@ export default function SecurityInfoScreen() {
           >
             <Settings size={20} color="#ffffff" />
             <Text style={styles.settingsButtonText}>Open App Settings</Text>
+            <ExternalLink size={16} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Battery Optimization</Text>
+          <Text style={styles.sectionText}>
+            Some devices aggressively stop background apps. To keep SMS
+            forwarding reliable, disable battery optimization for SMS Forwarder.
+          </Text>
+
+          <View style={styles.stepsBox}>
+            <View style={styles.step}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>1</Text>
+              </View>
+              <Text style={styles.stepText}>
+                Open <Text style={styles.bold}>Battery</Text> settings
+              </Text>
+            </View>
+            <View style={styles.step}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>2</Text>
+              </View>
+              <Text style={styles.stepText}>
+                Find <Text style={styles.bold}>Battery Optimization</Text>
+              </Text>
+            </View>
+            <View style={styles.step}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>3</Text>
+              </View>
+              <Text style={styles.stepText}>
+                Set <Text style={styles.bold}>SMS Forwarder</Text> to{' '}
+                <Text style={styles.bold}>Not optimized</Text>
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={openBatteryOptimizationSettings}
+          >
+            <Settings size={20} color="#ffffff" />
+            <Text style={styles.settingsButtonText}>
+              Open Battery Optimization
+            </Text>
             <ExternalLink size={16} color="#ffffff" />
           </TouchableOpacity>
         </View>

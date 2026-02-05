@@ -39,6 +39,8 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [showJsonTemplate, setShowJsonTemplate] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
 
   const loadConfig = useCallback(async () => {
     const data = await getConfig();
@@ -86,6 +88,65 @@ export default function SettingsScreen() {
       Alert.alert('Error', 'Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    if (!config.apiEndpoint.trim()) {
+      Alert.alert('Error', 'API endpoint is required');
+      return;
+    }
+
+    try {
+      const url = new URL(config.apiEndpoint.trim());
+      if (url.protocol !== 'https:') {
+        Alert.alert(
+          'Error',
+          'HTTPS is required for security. Please use an https:// URL.'
+        );
+        return;
+      }
+    } catch {
+      Alert.alert(
+        'Error',
+        'Please enter a valid URL (e.g., https://example.com/api/sms)'
+      );
+      return;
+    }
+
+    setTestingWebhook(true);
+    setWebhookStatus(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch(config.apiEndpoint.trim(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-SMS-Forwarder-Test': 'true',
+        },
+        body: JSON.stringify({
+          test: true,
+          sender: 'TestSender',
+          content: 'Test SMS from SMS Forwarder',
+          receivedAt: new Date().toISOString(),
+        }),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        setWebhookStatus('Webhook reachable. Test request succeeded.');
+      } else {
+        setWebhookStatus(`Webhook responded with HTTP ${response.status}.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setWebhookStatus(`Webhook test failed: ${message}`);
+    } finally {
+      clearTimeout(timeoutId);
+      setTestingWebhook(false);
     }
   };
 
@@ -167,6 +228,18 @@ export default function SettingsScreen() {
           <Text style={styles.helpText}>
             SMS data will be sent to this URL via POST request (HTTPS only)
           </Text>
+          <TouchableOpacity
+            style={[styles.testButton, testingWebhook && styles.testButtonDisabled]}
+            onPress={handleTestWebhook}
+            disabled={testingWebhook}
+          >
+            <Text style={styles.testButtonText}>
+              {testingWebhook ? 'Testing...' : 'Test Webhook'}
+            </Text>
+          </TouchableOpacity>
+          {webhookStatus && (
+            <Text style={styles.webhookStatusText}>{webhookStatus}</Text>
+          )}
         </View>
       </View>
 
@@ -665,6 +738,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  testButton: {
+    marginTop: 12,
+    backgroundColor: '#111827',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  testButtonDisabled: {
+    opacity: 0.6,
+  },
+  testButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  webhookStatusText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#6b7280',
   },
   tagContainer: {
     flexDirection: 'row',
