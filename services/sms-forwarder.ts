@@ -296,6 +296,7 @@ function extractSmsData(content: string): {
   const referencePatterns = [
     /(?:Reference|Ref)[:\s]+([A-Z0-9]+)/i,
     /\bref(?:erence)?\b\s*[:\-]?\s*([A-Z0-9]+)/i,
+    /\bref(?:erence)?\b\s*[:\-]?\s*([A-Z0-9]{2,})\b/i,
   ];
   for (const pattern of referencePatterns) {
     const match = content.match(pattern);
@@ -308,6 +309,7 @@ function extractSmsData(content: string): {
   // Extract payer phone number (e.g., "from 01815946458")
   const payerPatterns = [
     /\bfrom\s+([0-9+]{8,15})/i,
+    /\bto\s+([0-9+]{8,15})/i,
   ];
   for (const pattern of payerPatterns) {
     const match = content.match(pattern);
