@@ -1,5 +1,6 @@
 # dependencies
 node_modules/
+.tools/
 
 # expo
 .expo/
@@ -15,6 +16,8 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.keystore
+android/keystore/
 
 # metro
 .metro-health-check*
