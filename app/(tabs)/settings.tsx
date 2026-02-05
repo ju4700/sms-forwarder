@@ -55,9 +55,16 @@ export default function SettingsScreen() {
       return;
     }
 
-    // Validate URL format
+    // Validate URL format and enforce HTTPS
     try {
-      new URL(config.apiEndpoint.trim());
+      const url = new URL(config.apiEndpoint.trim());
+      if (url.protocol !== 'https:') {
+        Alert.alert(
+          'Error',
+          'HTTPS is required for security. Please use an https:// URL.'
+        );
+        return;
+      }
     } catch {
       Alert.alert(
         'Error',
@@ -158,7 +165,7 @@ export default function SettingsScreen() {
             keyboardType="url"
           />
           <Text style={styles.helpText}>
-            SMS data will be sent to this URL via POST request
+            SMS data will be sent to this URL via POST request (HTTPS only)
           </Text>
         </View>
       </View>
