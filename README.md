@@ -8,6 +8,7 @@ An Android app that automatically monitors incoming bKash SMS messages and forwa
 - **Automatic Forwarding**: Sends payment information to your configured API endpoint
 - **Payment Tracking**: View all forwarded payments with status tracking
 - **SMS Logs**: Complete history of all SMS messages received
+- **Background Mode**: Runs with a persistent notification so forwarding continues in the background
 - **Configurable Filters**: Customize which SMS messages to forward
 - **Test Mode**: Simulate SMS messages for testing without real transactions
 - **Secure**: Uses HTTPS for forwarding; local data is encrypted at rest on your device
@@ -186,6 +187,7 @@ Use the "Simulate Test SMS" button in the Monitor tab to test the app without re
 - **Permissions Required**: User must grant SMS permissions (Play Store distribution may require default SMS app eligibility)
 - **Network Required**: Must have internet connection to forward SMS
 - **Distribution**: This app is intended for direct distribution, not the Play Store, due to SMS permission restrictions
+- **Persistent Notification**: Android requires an ongoing notification for reliable background operation
 
 ## Troubleshooting
 

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import CryptoJS from 'crypto-js';
 import { SmsMessage } from '@/modules/sms-listener';
+import { updateForegroundNotification } from '@/modules/foreground-service';
 
 const CONFIG_KEY = '@sms_forwarder_config';
 const STATS_KEY = '@sms_forwarder_stats';
@@ -143,6 +144,12 @@ function matchesSenderFilter(sender: string, filter: string): boolean {
   }
 
   return normalizedSender === normalizedFilter;
+}
+
+function formatNotificationLine(log: ForwardedLog): string {
+  const snippet = log.content.replace(/\s+/g, ' ').trim();
+  const short = snippet.length > 60 ? `${snippet.slice(0, 57)}...` : snippet;
+  return `${log.sender}: ${short}`;
 }
 
 const DEFAULT_CONFIG: ForwarderConfig = {
@@ -447,10 +454,19 @@ export async function forwardSms(message: SmsMessage, config: ForwarderConfig, m
       });
 
       const stats = await getStats();
+      const totalForwarded = stats.totalForwarded + 1;
       await updateStats({
-        totalForwarded: stats.totalForwarded + 1,
+        totalForwarded,
         lastForwarded: new Date().toISOString(),
       });
+
+      const forwardedLogs = await getForwardedLogs();
+      const recentMessages = forwardedLogs
+        .filter(log => log.success)
+        .slice(0, 5)
+        .map(formatNotificationLine);
+
+      updateForegroundNotification(totalForwarded, recentMessages);
 
       return true;
     } catch (error) {

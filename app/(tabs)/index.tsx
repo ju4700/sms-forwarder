@@ -31,7 +31,9 @@ import {
   ForwarderConfig,
   saveConfig,
   getSmsLogs,
+  getForwardedLogs,
 } from '@/services/sms-forwarder';
+import { startForegroundService, stopForegroundService } from '@/modules/foreground-service';
 
 export default function MonitorScreen() {
   const [hasPermissions, setHasPermissions] = useState(false);
@@ -63,6 +65,18 @@ export default function MonitorScreen() {
     }
   }, []);
 
+  const syncForegroundNotification = useCallback(async () => {
+    const [statsData, forwardedLogs] = await Promise.all([
+      getStats(),
+      getForwardedLogs(),
+    ]);
+    const recentMessages = forwardedLogs
+      .filter(log => log.success)
+      .slice(0, 5)
+      .map(log => `${log.sender}: ${log.content.replace(/\s+/g, ' ').trim().slice(0, 60)}`);
+    startForegroundService(statsData.totalForwarded, recentMessages);
+  }, []);
+
   useEffect(() => {
     const initialize = async () => {
       await loadData();
@@ -74,6 +88,10 @@ export default function MonitorScreen() {
         if (granted) {
           await loadData();
         }
+      }
+      const configData = await getConfig();
+      if (configData.enabled) {
+        await syncForegroundNotification();
       }
     };
     initialize();
@@ -129,6 +147,11 @@ export default function MonitorScreen() {
     const newConfig = { ...config, enabled: !config.enabled };
     await saveConfig(newConfig);
     setConfig(newConfig);
+    if (newConfig.enabled) {
+      await syncForegroundNotification();
+    } else {
+      stopForegroundService();
+    }
   };
 
   const handleTestSms = () => {

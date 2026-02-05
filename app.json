@@ -30,7 +30,9 @@
       },
       "permissions": [
         "android.permission.RECEIVE_SMS",
-        "android.permission.READ_SMS"
+        "android.permission.READ_SMS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
       ],
       "blockedPermissions": [],
       "playStoreUrl": ""
@@ -50,7 +52,9 @@
           "android": {
             "permissions": [
               "android.permission.RECEIVE_SMS",
-              "android.permission.READ_SMS"
+              "android.permission.READ_SMS",
+              "android.permission.FOREGROUND_SERVICE",
+              "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
             ],
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
