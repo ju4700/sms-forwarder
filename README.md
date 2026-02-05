@@ -1,6 +1,6 @@
 # bKash SMS Forwarder
 
-An Android app that automatically monitors incoming bKash SMS messages and forwards them to a web application for payment verification and status updates.
+An Android app that automatically monitors incoming bKash SMS messages and forwards them to a web application for payment verification and status updates...
 
 ## Features
 
