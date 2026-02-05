@@ -68,6 +68,11 @@ export default function ForwardedScreen() {
         <Text style={styles.contentText} numberOfLines={3}>
           {item.content}
         </Text>
+        {!item.success && item.errorMessage ? (
+          <Text style={styles.errorText} numberOfLines={2}>
+            Error: {item.errorMessage}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.logFooter}>
@@ -232,6 +237,12 @@ const styles = StyleSheet.create({
     color: '#374151',
     lineHeight: 22,
     fontFamily: 'monospace',
+  },
+  errorText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#dc2626',
+    lineHeight: 18,
   },
   logFooter: {
     flexDirection: 'row',

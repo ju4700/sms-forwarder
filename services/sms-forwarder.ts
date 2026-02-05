@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import CryptoJS from 'crypto-js';
 import { SmsMessage } from '@/modules/sms-listener';
 
 const CONFIG_KEY = '@sms_forwarder_config';
 const STATS_KEY = '@sms_forwarder_stats';
 const SMS_LOGS_KEY = '@sms_forwarder_logs';
 const FORWARDED_LOGS_KEY = '@sms_forwarder_forwarded';
+const MASTER_KEY_NAME = '@sms_forwarder_master_key';
 
 export type ForwarderConfig = {
   apiEndpoint: string;
@@ -41,7 +44,106 @@ export type ForwardedLog = {
   forwardedAt: string;
   success: boolean;
   matchedKeyword: string | null;
+  errorMessage?: string;
 };
+
+async function getMasterKey(): Promise<string | null> {
+  try {
+    let key = await SecureStore.getItemAsync(MASTER_KEY_NAME);
+    if (!key) {
+      key = CryptoJS.lib.WordArray.random(32).toString();
+      await SecureStore.setItemAsync(MASTER_KEY_NAME, key);
+    }
+    return key;
+  } catch {
+    return null;
+  }
+}
+
+async function encryptPayload(payload: unknown): Promise<string> {
+  const key = await getMasterKey();
+  const json = JSON.stringify(payload);
+  if (!key) {
+    return json;
+  }
+  return CryptoJS.AES.encrypt(json, key).toString();
+}
+
+async function decryptPayload<T>(storedValue: string): Promise<T | null> {
+  const key = await getMasterKey();
+  if (!key) {
+    try {
+      return JSON.parse(storedValue) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const decrypted = CryptoJS.AES.decrypt(storedValue, key).toString(
+      CryptoJS.enc.Utf8
+    );
+    if (!decrypted) {
+      throw new Error('Empty decrypt result');
+    }
+    return JSON.parse(decrypted) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function getStoredJson<T>(key: string, fallback: T): Promise<T> {
+  try {
+    const storedValue = await AsyncStorage.getItem(key);
+    if (!storedValue) {
+      return fallback;
+    }
+
+    const decrypted = await decryptPayload<T>(storedValue);
+    if (decrypted !== null) {
+      return decrypted;
+    }
+
+    const parsed = JSON.parse(storedValue) as T;
+    await setStoredJson(key, parsed);
+    return parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+async function setStoredJson<T>(key: string, value: T): Promise<void> {
+  const payload = await encryptPayload(value);
+  await AsyncStorage.setItem(key, payload);
+}
+
+function normalizeSender(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function matchesSenderFilter(sender: string, filter: string): boolean {
+  const trimmedFilter = filter.trim().toLowerCase();
+  if (!trimmedFilter) {
+    return false;
+  }
+
+  const hasLeadingWildcard = trimmedFilter.startsWith('*');
+  const hasTrailingWildcard = trimmedFilter.endsWith('*');
+  const normalizedFilter = normalizeSender(
+    trimmedFilter.replace(/^\*+|\*+$/g, '')
+  );
+  const normalizedSender = normalizeSender(sender);
+
+  if (!normalizedFilter) {
+    return false;
+  }
+
+  if (hasLeadingWildcard || hasTrailingWildcard) {
+    return normalizedSender.includes(normalizedFilter);
+  }
+
+  return normalizedSender === normalizedFilter;
+}
 
 const DEFAULT_CONFIG: ForwarderConfig = {
   apiEndpoint: '',
@@ -64,76 +166,56 @@ const DEFAULT_STATS: ForwarderStats = {
 
 // Config functions
 export async function getConfig(): Promise<ForwarderConfig> {
-  try {
-    const data = await AsyncStorage.getItem(CONFIG_KEY);
-    return data ? JSON.parse(data) : DEFAULT_CONFIG;
-  } catch {
-    return DEFAULT_CONFIG;
-  }
+  return getStoredJson(CONFIG_KEY, DEFAULT_CONFIG);
 }
 
 export async function saveConfig(config: ForwarderConfig): Promise<void> {
-  await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  await setStoredJson(CONFIG_KEY, config);
 }
 
 // Stats functions
 export async function getStats(): Promise<ForwarderStats> {
-  try {
-    const data = await AsyncStorage.getItem(STATS_KEY);
-    return data ? JSON.parse(data) : DEFAULT_STATS;
-  } catch {
-    return DEFAULT_STATS;
-  }
+  return getStoredJson(STATS_KEY, DEFAULT_STATS);
 }
 
 async function updateStats(update: Partial<ForwarderStats>): Promise<void> {
   const stats = await getStats();
   const newStats = { ...stats, ...update };
-  await AsyncStorage.setItem(STATS_KEY, JSON.stringify(newStats));
+  await setStoredJson(STATS_KEY, newStats);
 }
 
 export async function resetStats(): Promise<void> {
-  await AsyncStorage.setItem(STATS_KEY, JSON.stringify(DEFAULT_STATS));
+  await setStoredJson(STATS_KEY, DEFAULT_STATS);
 }
 
 // SMS Logs functions (all received SMS)
 export async function getSmsLogs(): Promise<SmsLog[]> {
-  try {
-    const data = await AsyncStorage.getItem(SMS_LOGS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+  return getStoredJson(SMS_LOGS_KEY, []);
 }
 
 async function saveSmsLog(log: SmsLog): Promise<void> {
   const logs = await getSmsLogs();
   const updatedLogs = [log, ...logs].slice(0, 100); // Keep last 100 logs
-  await AsyncStorage.setItem(SMS_LOGS_KEY, JSON.stringify(updatedLogs));
+  await setStoredJson(SMS_LOGS_KEY, updatedLogs);
 }
 
 export async function clearSmsLogs(): Promise<void> {
-  await AsyncStorage.setItem(SMS_LOGS_KEY, JSON.stringify([]));
+  await setStoredJson(SMS_LOGS_KEY, []);
 }
 
 // Forwarded Logs functions
 export async function getForwardedLogs(): Promise<ForwardedLog[]> {
-  try {
-    const data = await AsyncStorage.getItem(FORWARDED_LOGS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+  return getStoredJson(FORWARDED_LOGS_KEY, []);
 }
 
 async function saveForwardedLog(log: ForwardedLog): Promise<void> {
   const logs = await getForwardedLogs();
   const updatedLogs = [log, ...logs].slice(0, 100); // Keep last 100 logs
-  await AsyncStorage.setItem(FORWARDED_LOGS_KEY, JSON.stringify(updatedLogs));
+  await setStoredJson(FORWARDED_LOGS_KEY, updatedLogs);
 }
 
 export async function clearForwardedLogs(): Promise<void> {
-  await AsyncStorage.setItem(FORWARDED_LOGS_KEY, JSON.stringify([]));
+  await setStoredJson(FORWARDED_LOGS_KEY, []);
 }
 
 // Check if SMS should be forwarded based on filters
@@ -144,9 +226,8 @@ export function shouldForwardSms(message: SmsMessage, config: ForwarderConfig): 
 
   // Check sender whitelist
   if (config.allowedSenders && config.allowedSenders.length > 0) {
-    const senderLower = message.sender.toLowerCase();
-    const isAllowed = config.allowedSenders.some(
-      allowed => senderLower.includes(allowed.toLowerCase()) || allowed.toLowerCase().includes(senderLower)
+    const isAllowed = config.allowedSenders.some(allowed =>
+      matchesSenderFilter(message.sender, allowed)
     );
     if (!isAllowed) {
       return { shouldForward: false, matchedKeyword: null, reason: 'Sender not in whitelist' };
@@ -155,9 +236,8 @@ export function shouldForwardSms(message: SmsMessage, config: ForwarderConfig): 
 
   // Check sender blacklist
   if (config.blockedSenders && config.blockedSenders.length > 0) {
-    const senderLower = message.sender.toLowerCase();
-    const isBlocked = config.blockedSenders.some(
-      blocked => senderLower.includes(blocked.toLowerCase()) || blocked.toLowerCase().includes(senderLower)
+    const isBlocked = config.blockedSenders.some(blocked =>
+      matchesSenderFilter(message.sender, blocked)
     );
     if (isBlocked) {
       return { shouldForward: false, matchedKeyword: null, reason: 'Sender in blacklist' };
@@ -396,6 +476,7 @@ export async function forwardSms(message: SmsMessage, config: ForwarderConfig, m
         forwardedAt: new Date().toISOString(),
         success: false,
         matchedKeyword,
+        errorMessage,
       });
 
       const stats = await getStats();

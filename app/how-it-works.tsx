@@ -151,7 +151,7 @@ export default function HowItWorksScreen() {
           <Text style={styles.sectionTitle}>Where Is Data Stored?</Text>
           <View style={styles.storageInfo}>
             <Text style={styles.storageText}>
-              📱 <Text style={styles.bold}>On your device</Text> - Using secure
+              📱 <Text style={styles.bold}>On your device</Text> - Using encrypted
               local storage (AsyncStorage)
             </Text>
             <Text style={styles.storageText}>

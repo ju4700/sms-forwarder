@@ -33,7 +33,7 @@
         "android.permission.READ_SMS"
       ],
       "blockedPermissions": [],
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.smsforwarder.app"
+      "playStoreUrl": ""
     },
     "web": {
       "bundler": "metro",

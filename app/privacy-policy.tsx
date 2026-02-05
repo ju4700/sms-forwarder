@@ -79,6 +79,9 @@ export default function PrivacyPolicyScreen() {
               ✓ We <Text style={styles.bold}>CANNOT</Text> access your data - it
               never leaves your device
             </Text>
+            <Text style={styles.highlightText}>
+              ✓ Local storage is encrypted at rest using a device-protected key
+            </Text>
           </View>
         </View>
 

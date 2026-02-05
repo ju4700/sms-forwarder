@@ -261,6 +261,9 @@ export default function SettingsScreen() {
           Control which senders to forward SMS from. Leave empty to allow all
           senders.
         </Text>
+        <Text style={styles.helpText}>
+          Tip: Use * for partial matches (e.g., *bkash*)
+        </Text>
 
         <View style={styles.inputRow}>
           <TouchableOpacity

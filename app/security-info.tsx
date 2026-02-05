@@ -207,13 +207,13 @@ export default function SecurityInfoScreen() {
             <View style={styles.faqQuestion}>
               <HelpCircle size={18} color="#0057FF" />
               <Text style={styles.faqQuestionText}>
-                Why isn't this on the Play Store?
+                Why is this distributed directly?
               </Text>
             </View>
             <Text style={styles.faqAnswer}>
-              Google has strict policies about apps that use SMS permissions.
-              Most SMS apps are only allowed if they're the default SMS handler.
-              We're working on Play Store submission.
+              Android treats SMS permissions as sensitive. This app is
+              distributed directly so you can install it with full SMS
+              forwarding functionality.
             </Text>
           </View>
 

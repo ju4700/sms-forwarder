@@ -10,7 +10,7 @@ An Android app that automatically monitors incoming bKash SMS messages and forwa
 - **SMS Logs**: Complete history of all SMS messages received
 - **Configurable Filters**: Customize which SMS messages to forward
 - **Test Mode**: Simulate SMS messages for testing without real transactions
-- **Secure**: All data is encrypted and permissions are properly managed
+- **Secure**: Uses HTTPS for forwarding; local data is encrypted at rest on your device
 
 ## Screenshots
 
@@ -176,15 +176,16 @@ Use the "Simulate Test SMS" button in the Monitor tab to test the app without re
 - SMS permissions are required and must be granted by user
 - All API communication uses HTTPS
 - Database access is protected with Row Level Security
-- No sensitive data is stored locally
+- SMS logs and configuration are stored locally, encrypted at rest, and can be cleared in Settings
 - All payment processing happens on the backend
 
 ## Limitations
 
 - **Android Only**: iOS doesn't allow apps to read SMS messages
 - **Development Build Required**: Cannot run in Expo Go
-- **Permissions Required**: User must grant SMS permissions
+- **Permissions Required**: User must grant SMS permissions (Play Store distribution may require default SMS app eligibility)
 - **Network Required**: Must have internet connection to forward SMS
+- **Distribution**: This app is intended for direct distribution, not the Play Store, due to SMS permission restrictions
 
 ## Troubleshooting
 
