@@ -271,23 +271,48 @@ export function shouldForwardSms(message: SmsMessage, config: ForwarderConfig): 
 // Extract data from SMS content using regex patterns
 function extractSmsData(content: string): {
   transactionId?: string;
-  referenceId?: string;
+  reference?: string;
   amount?: number;
+  payerPhone?: string;
   [key: string]: any;
 } {
   const data: any = {};
 
-  // Extract transaction/reference ID
+  // Extract transaction ID (TrxID)
   const refPatterns = [
+    /\bTrxID\b[:\s]*([A-Z0-9]+)/i,
     /(?:TrxID|Transaction\s*ID|Txn\s*ID)[:\s]+([A-Z0-9]+)/i,
-    /(?:Reference|Ref)[:\s]+([A-Z0-9]+)/i,
     /(?:ID|Code)[:\s]+([A-Z0-9]{6,})/i,
   ];
   for (const pattern of refPatterns) {
     const match = content.match(pattern);
     if (match) {
       data.transactionId = match[1];
-      data.referenceId = match[1];
+      break;
+    }
+  }
+
+  // Extract reference (e.g., "Reference LC501" or "Ref: LC501")
+  const referencePatterns = [
+    /(?:Reference|Ref)[:\s]+([A-Z0-9]+)/i,
+    /\bref(?:erence)?\b\s*[:\-]?\s*([A-Z0-9]+)/i,
+  ];
+  for (const pattern of referencePatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      data.reference = match[1];
+      break;
+    }
+  }
+
+  // Extract payer phone number (e.g., "from 01815946458")
+  const payerPatterns = [
+    /\bfrom\s+([0-9+]{8,15})/i,
+  ];
+  for (const pattern of payerPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      data.payerPhone = match[1];
       break;
     }
   }
@@ -325,8 +350,9 @@ function parseJsonTemplate(
       .replace(/\{\{timestamp\}\}/g, message.timestamp.toString())
       .replace(/\{\{matchedKeyword\}\}/g, JSON.stringify(matchedKeyword || ''))
       .replace(/\{\{transactionId\}\}/g, JSON.stringify(extractedData.transactionId || ''))
-      .replace(/\{\{referenceId\}\}/g, JSON.stringify(extractedData.referenceId || ''))
-      .replace(/\{\{amount\}\}/g, extractedData.amount?.toString() || '0');
+      .replace(/\{\{reference\}\}/g, JSON.stringify(extractedData.reference || ''))
+        .replace(/\{\{amount\}\}/g, extractedData.amount?.toString() || '0')
+        .replace(/\{\{payerPhone\}\}/g, JSON.stringify(extractedData.payerPhone || ''));
 
     // Support custom regex patterns: {{regex:pattern:group}}
     const regexPattern = /\{\{regex:([^:]+):(\d+)\}\}/g;
@@ -388,13 +414,10 @@ export async function forwardSms(message: SmsMessage, config: ForwarderConfig, m
       } else {
         // Use default JSON structure
         requestBody = {
-          sender: message.sender,
-          content: message.content,
-          receivedAt: new Date(message.timestamp).toISOString(),
-          referenceId: extractedData.referenceId,
-          transactionId: extractedData.transactionId,
+          senderPhone: extractedData.payerPhone || message.sender,
           amount: extractedData.amount,
-          matchedKeyword,
+          transactionId: extractedData.transactionId,
+          reference: extractedData.reference,
         };
       }
 

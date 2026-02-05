@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import DrawerContent from '@/components/DrawerContent';
@@ -31,9 +33,52 @@ export const useDrawer = () => useContext(DrawerContext);
 export default function RootLayout() {
   useFrameworkReady();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const translateX = useRef(new Animated.Value(-drawerWidth)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  const openDrawer = () => setDrawerOpen(true);
-  const closeDrawer = () => setDrawerOpen(false);
+  const openDrawer = () => {
+    setDrawerVisible(true);
+    setDrawerOpen(true);
+    translateX.setValue(-drawerWidth);
+    backdropOpacity.setValue(0);
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0.5,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeDrawer = () => {
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -drawerWidth,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setDrawerOpen(false);
+        setDrawerVisible(false);
+      }
+    });
+  };
 
   return (
     <DrawerContext.Provider
@@ -74,20 +119,25 @@ export default function RootLayout() {
 
       {/* Custom Drawer Modal */}
       <Modal
-        visible={drawerOpen}
-        animationType="slide"
+        visible={drawerVisible}
+        animationType="none"
         transparent={true}
         onRequestClose={closeDrawer}
       >
         <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={closeDrawer}
-          />
-          <View style={styles.drawerContainer}>
+          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}
+          >
+            <TouchableOpacity
+              style={styles.backdropTouchable}
+              activeOpacity={1}
+              onPress={closeDrawer}
+            />
+          </Animated.View>
+          <Animated.View
+            style={[styles.drawerContainer, { transform: [{ translateX }] }]}
+          >
             <DrawerContent onClose={closeDrawer} />
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -97,11 +147,11 @@ export default function RootLayout() {
 }
 
 const { width } = Dimensions.get('window');
+const drawerWidth = Math.min(width * 0.85, 320);
 
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    flexDirection: 'row',
   },
   backdrop: {
     position: 'absolute',
@@ -111,9 +161,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  backdropTouchable: {
+    ...StyleSheet.absoluteFillObject,
+  },
   drawerContainer: {
-    width: width * 0.85,
-    maxWidth: 320,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: drawerWidth,
     backgroundColor: '#ffffff',
     height: '100%',
   },

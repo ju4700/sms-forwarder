@@ -128,7 +128,7 @@ export default function MonitorScreen() {
     if (!granted) {
       Alert.alert(
         'Permission Denied',
-        'SMS permissions are required for this app to work. Please grant permissions in your device settings.'
+        'SMS permissions are required for this app to work. If you see “Restricted settings”, go to App info → ⋮ → Allow restricted settings, then grant SMS permissions in Settings.'
       );
     }
   };
