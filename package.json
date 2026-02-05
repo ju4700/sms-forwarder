@@ -11,6 +11,7 @@
     "build:web": "expo export --platform web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
+    "generate:icons": "node scripts/generate-icons.mjs",
     "build:android:preview": "eas build --platform android --profile preview",
     "build:android:production": "eas build --platform android --profile production",
     "submit:android": "eas submit --platform android"
@@ -60,6 +61,7 @@
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.1.10",
     "expo-build-properties": "^0.12.5",
+    "sharp": "^0.33.5",
     "typescript": "~5.9.2"
   },
   "expo": {

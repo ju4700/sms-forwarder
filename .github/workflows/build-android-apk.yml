@@ -1,0 +1,58 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: false
+        default: preview
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Build APK with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          PROFILE=${{ inputs.profile || 'preview' }}
+          eas build --platform android --profile "$PROFILE" --non-interactive --wait --json > build.json
+
+      - name: Extract build artifact URL
+        run: |
+          node -e "const fs=require('fs');const data=JSON.parse(fs.readFileSync('build.json','utf8'));const build=Array.isArray(data)?data[0]:data;const url=build?.artifacts?.buildUrl||build?.artifacts?.buildUrl||build?.artifacts?.url||build?.artifactUrl; if(!url){console.error('No artifact URL found in build.json');process.exit(1);} fs.writeFileSync('artifact_url.txt',url); console.log(url);"
+
+      - name: Download APK
+        run: |
+          url=$(cat artifact_url.txt)
+          curl -L "$url" -o app-release.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: app-release.apk
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app-release.apk

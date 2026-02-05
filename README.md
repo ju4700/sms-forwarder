@@ -74,6 +74,10 @@ eas build --profile development --platform android
 
 See [SMS_SETUP.md](./SMS_SETUP.md) for detailed instructions.
 
+### GitHub Release (APK)
+
+If you want an installable APK for GitHub Releases (outside the Play Store), use the preview build profile. See [docs/GITHUB_RELEASE.md](docs/GITHUB_RELEASE.md) for the full guide and CI setup.
+
 ## Usage
 
 ### Initial Setup
