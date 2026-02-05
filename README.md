@@ -93,12 +93,16 @@ The app sends POST requests to your configured endpoint with this structure:
 
 ```json
 {
-  "sender": "bKash",
-  "content": "Full SMS message text",
-  "receivedAt": "2024-01-01T12:00:00.000Z",
-  "referenceId": "ABC123XYZ"
+  "senderPhone": "01812345678",
+  "amount": 1020,
+  "transactionId": "DAQ0HBV6EG",
+  "reference": "LUC006"
 }
 ```
+
+Notes:
+- `senderPhone` is extracted from the SMS when possible (e.g. `from ...`), otherwise falls back to the SMS sender label.
+- `reference` is extracted from `Ref ...` / `Reference ...` if present.
 
 Your API should respond with:
 
@@ -109,6 +113,14 @@ Your API should respond with:
   "message": "SMS forwarded successfully"
 }
 ```
+
+#### Linkup (Next.js) integration
+
+If you are using this forwarder with Linkup, set:
+- `apiEndpoint`: `https://<your-domain>/api/bkash/webhook`
+- `customHeaders` (optional but recommended):
+  - `Authorization: Bearer <BKASH_WEBHOOK_SECRET>` (or)
+  - `x-bkash-webhook-secret: <BKASH_WEBHOOK_SECRET>`
 
 ### Database Schema
 
